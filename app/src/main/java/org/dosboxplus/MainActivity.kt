@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
         editor != null -> {
             val request = editor!!
             val initial = request.game?.profileId?.let(repo::profile)
-                ?: if (request.game == null) repo.globalProfile() else null
+                ?: (if (request.game == null) repo.globalProfile() else null)
                 ?: Profile(name = request.game?.title ?: "Globale")
             ProfileEditorScreen(initial, request.game?.title ?: "Globale", onSave = { profile ->
                 if (request.game == null) repo.saveGlobalProfile(profile) else repo.assignProfile(request.game, profile)

@@ -11,12 +11,45 @@
  else ifeq ($(TARGET_ARCH_ABI), x86)
      WITH_DYNAREC := x86
  else ifeq ($(TARGET_ARCH_ABI), x86_64)
-@@ -17,7 +19,7 @@
+@@ -17,7 +19,10 @@
  
  COMMONFLAGS += -D__LIBRETRO__ -DFRONTEND_SUPPORTS_RGB565 $(INCFLAGS) -DC_HAVE_MPROTECT="1"
++# Keep warnings enabled for the local JNI host while isolating known legacy-core diagnostics.
++COMMONFLAGS += -Wno-format -Wno-switch -Wno-deprecated-register -Wno-address-of-packed-member -Wno-unused-value -Wno-non-c-typedef-for-linkage -Wno-bitwise-conditional-parentheses -Wno-unused-result
++
  
 -GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
 +GIT_VERSION := " 4024bf0"
  ifneq ($(GIT_VERSION)," unknown")
      COMMONFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
  endif
+--- a/src/hardware/dbopl.cpp
++++ b/src/hardware/dbopl.cpp
+@@ -885,0 +886,3 @@ Channel* Channel::BlockTemplate( Chip* chip, Bit32u samples, Bit32s* output ) {
++	case sm2Percussion:
++	case sm3Percussion:
++		break;
+@@ -949,0 +953,3 @@ Channel* Channel::BlockTemplate( Chip* chip, Bit32u samples, Bit32s* output ) {
++		case sm2Percussion:
++		case sm3Percussion:
++			break;
+--- a/libretro-common/libco/armeabi.c
++++ b/libretro-common/libco/armeabi.c
+@@ -28,6 +28,8 @@ __asm__ (
+       ".align 2\n"
+       ".globl co_switch_arm\n"
+       ".globl _co_switch_arm\n"
++      ".type co_switch_arm, %function\n"
++      ".type _co_switch_arm, %function\n"
+       "co_switch_arm:\n"
+       "_co_switch_arm:\n"
+       " mov r3, sp\n"
+@@ -43,6 +45,8 @@ __asm__ (
+       ".align 4\n"
+       ".globl co_switch_arm\n"
+       ".globl _co_switch_arm\n"
++      ".type co_switch_arm, %function\n"
++      ".type _co_switch_arm, %function\n"
+       "co_switch_arm:\n"
+       "_co_switch_arm:\n"
+       "  stmia r1!, {r4, r5, r6, r7, r8, r9, r10, r11, sp, lr}\n"
