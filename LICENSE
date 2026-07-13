@@ -1,0 +1,5 @@
+DOSBox Plus is distributed under GNU GPL version 2 or later.
+
+The DOSBox emulator core is dosbox-libretro and remains copyright its respective
+authors. Obtain the complete corresponding source, including local patches,
+from this repository/release source bundle. See docs/UPSTREAM.md.

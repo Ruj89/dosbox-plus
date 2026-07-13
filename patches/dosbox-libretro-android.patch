@@ -1,0 +1,22 @@
+--- a/jni/Android.mk
++++ b/jni/Android.mk
+@@ -6,7 +6,9 @@
+ ifeq ($(TARGET_ARCH_ABI), armeabi)
+     WITH_DYNAREC := oldarm
+ else ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
+-    WITH_DYNAREC := arm
++    # The legacy ARM dynarec writes Linux syscall register r7 directly.
++    # Modern Android NDK/Clang reserves r7, so use the portable CPU core.
++    WITH_DYNAREC :=
+ else ifeq ($(TARGET_ARCH_ABI), x86)
+     WITH_DYNAREC := x86
+ else ifeq ($(TARGET_ARCH_ABI), x86_64)
+@@ -17,7 +19,7 @@
+ 
+ COMMONFLAGS += -D__LIBRETRO__ -DFRONTEND_SUPPORTS_RGB565 $(INCFLAGS) -DC_HAVE_MPROTECT="1"
+ 
+-GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
++GIT_VERSION := " 4024bf0"
+ ifneq ($(GIT_VERSION)," unknown")
+     COMMONFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+ endif

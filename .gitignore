@@ -1,0 +1,44 @@
+# Gradle / Android build output
+.gradle/
+**/build/
+.cxx/
+**/.cxx/
+local.properties
+
+# Reproducibly downloaded upstream sources
+upstream/
+app/src/main/jni/dosbox-libretro/
+
+# Docker/exported artifacts
+dist/
+*.apk
+*.aab
+*.apks
+*.aar
+build.log
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+externalNativeBuild/
+
+# Native build products
+obj/
+libs/
+*.so
+*.o
+*.a
+
+# Signing material and machine-local secrets
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Operating-system/editor files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo

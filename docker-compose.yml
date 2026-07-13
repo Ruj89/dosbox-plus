@@ -1,0 +1,6 @@
+services:
+  build:
+    build:
+      context: .
+      target: artifacts
+    # Run `docker build --output type=local,dest=dist .` to extract APKs.
