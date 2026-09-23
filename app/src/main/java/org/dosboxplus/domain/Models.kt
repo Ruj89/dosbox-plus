@@ -18,7 +18,8 @@ import java.util.UUID
     val id: String = UUID.randomUUID().toString(), val type: ControlType,
     val x: Float, val y: Float, val width: Float, val height: Float, val zIndex: Int = 0,
     val label: String = "", val opacity: Float = 0.68f,
-    val trigger: ControlTrigger = ControlTrigger.TAP, val action: InputAction
+    val trigger: ControlTrigger = ControlTrigger.TAP, val action: InputAction,
+    val image: String? = null
 )
 @Serializable enum class ControlType { BUTTON, DPAD, JOYSTICK, MOUSE, KEYBOARD }
 @Serializable enum class ControlTrigger { TAP, HOLD }
