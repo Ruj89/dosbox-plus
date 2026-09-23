@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A compact terminal silhouette, kept inside the adaptive icon safe area. -->
+    <path android:fillColor="#263B4A"
+        android:pathData="M26,23 L82,23 L88,29 L88,77 L82,83 L26,83 L20,77 L20,29 Z" />
+    <path android:fillColor="#80E0CE"
+        android:pathData="M26,23 L82,23 L88,29 L88,77 L82,83 L26,83 L20,77 L20,29 Z M27,28 L25,30 L25,76 L27,78 L81,78 L83,76 L83,30 L81,28 Z"
+        android:fillType="evenOdd" />
+    <path android:fillColor="#17232F"
+        android:pathData="M29,32 L79,32 L79,73 L29,73 Z" />
+    <path android:fillColor="#45687A"
+        android:pathData="M29,32 L79,32 L79,37 L29,37 Z" />
+    <path android:fillColor="#80E0CE"
+        android:pathData="M35,45 L42,52 L35,59 L35,54 L38,52 L35,50 Z M45,57 L58,57 L58,61 L45,61 Z" />
+    <path android:fillColor="#F5C875"
+        android:pathData="M68,44 L72,44 L72,49 L77,49 L77,53 L72,53 L72,58 L68,58 L68,53 L63,53 L63,49 L68,49 Z" />
+    <path android:fillColor="#45687A"
+        android:pathData="M34,68 L39,68 L39,70 L34,70 Z M42,68 L47,68 L47,70 L42,70 Z M50,68 L55,68 L55,70 L50,70 Z" />
+</vector>

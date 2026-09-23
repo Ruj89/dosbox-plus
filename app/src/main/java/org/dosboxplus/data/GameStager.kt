@@ -8,6 +8,7 @@ import java.io.File
 object GameStager {
     fun stage(context: Context, gameId: String, treeUri: String): File {
         val source = requireNotNull(DocumentFile.fromTreeUri(context, android.net.Uri.parse(treeUri))) { "Invalid game directory" }
+        require(source.exists() && source.canRead()) { "Game directory is not readable" }
         val target = File(context.cacheDir, "games/$gameId").also { it.deleteRecursively(); it.mkdirs() }
         copy(context, source, target); return target
     }
@@ -15,7 +16,7 @@ object GameStager {
         source.listFiles().forEach { child ->
             val out = File(destination, child.name ?: return@forEach)
             if (child.isDirectory) { out.mkdirs(); copy(context, child, out) }
-            else context.contentResolver.openInputStream(child.uri)?.use { input ->
+            else requireNotNull(context.contentResolver.openInputStream(child.uri)) { "Cannot read ${child.name}" }.use { input ->
                 out.outputStream().use { output -> input.copyTo(output) }
             }
         }
