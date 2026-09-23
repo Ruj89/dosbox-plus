@@ -14,6 +14,20 @@ android {
     compileSdk = 35
     ndkVersion = "27.2.12479018"
 
+    signingConfigs {
+        create("release") {
+            fun envOrProp(name: String): String? =
+                System.getenv(name) ?: project.findProperty(name) as String?
+            val storePath = envOrProp("RELEASE_STORE_FILE")
+            if (!storePath.isNullOrBlank()) {
+                storeFile = file(storePath)
+                storePassword = envOrProp("RELEASE_STORE_PASSWORD")
+                keyAlias = envOrProp("RELEASE_KEY_ALIAS") ?: "dosbox-plus"
+                keyPassword = envOrProp("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "org.dosboxplus"
         minSdk = 26
@@ -30,6 +44,19 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     externalNativeBuild { ndkBuild { path = file("src/main/jni/Android.mk") } }
     splits { abi { isEnable = true; reset(); include("arm64-v8a", "armeabi-v7a"); isUniversalApk = false } }
+    buildTypes {
+        release {
+            // Firmata solo quando RELEASE_STORE_FILE punta a un keystore esistente
+            // (lo script scripts/build-release.sh lo fornisce sempre).
+            val storePath = System.getenv("RELEASE_STORE_FILE")
+                ?: project.findProperty("RELEASE_STORE_FILE") as String?
+            if (!storePath.isNullOrBlank() && file(storePath).exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+    }
 }
 
 dependencies {

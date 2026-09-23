@@ -107,6 +107,23 @@ To keep a complete log and make Kotlin diagnostics visible:
 bash scripts/build-apk.sh 2>&1 | tee build.log
 ```
 
+### Build release firmata
+
+Per compilare gli APK release firmati con chiave persistente ed esportare
+il backup delle chiavi per firme future, esegui:
+
+```sh
+bash scripts/build-release.sh
+```
+
+Lo script crea il volume Docker `dosbox-plus-release-signing` (chiave
+RSA 3072 generata solo alla prima build), compila `assembleRelease` e copia
+in `dist/` gli APK firmati più il backup in `dist/release-keys/`
+(`dosbox-plus-release.jks`, `store.password`, `key.password`, `key.alias`,
+certificato pubblico `.pem`, checksum e `README.txt` con le istruzioni di
+reimport). Conserva una copia sicura di `dist/release-keys/` fuori da git:
+chi la possiede può pubblicare aggiornamenti con la stessa firma.
+
 The build downloads a pinned `dosbox-libretro` source archive and verifies
 its checksum. JVM tests are run while creating the image;
 to run them again after the build:

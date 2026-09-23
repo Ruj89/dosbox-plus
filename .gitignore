@@ -33,8 +33,12 @@ libs/
 # Signing material and machine-local secrets
 *.jks
 *.keystore
+*.password
 keystore.properties
 signing.properties
+release-keys/
+release-keys-backup/
+build-release.log
 
 # Operating-system/editor files
 .DS_Store
