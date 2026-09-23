@@ -24,6 +24,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +38,10 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          packages: ''
+          accept-android-sdk-licenses: 'false'
 
       - name: Install Android packages
         run: |
@@ -58,14 +64,14 @@ jobs:
         run: gradle --no-daemon --console=plain test
 
       - name: Decode release keystore (if secrets present)
-        if: secrets.RELEASE_KEYSTORE_BASE64 != ''
+        if: env.RELEASE_KEYSTORE_BASE64 != ''
         env:
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
-          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
           echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
-          if [ -z "${{ secrets.RELEASE_STORE_PASSWORD }}" ]; then
-            echo "::warning::RELEASE_KEYSTORE_BASE64 presente ma RELEASE_STORE_PASSWORD mancante: la release non sara' firmata."
+          if [ -z "$RELEASE_STORE_PASSWORD" ]; then
+            echo "::warning::RELEASE_KEYSTORE_BASE64 is set, but RELEASE_STORE_PASSWORD is missing: the release will not be signed."
           fi
 
       - name: Build release APKs
@@ -76,7 +82,7 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.ANDROID_NDK }}
         run: |
           if [ -z "${RELEASE_STORE_FILE:-}" ]; then
-            echo "::notice::Nessun keystore release configurato: build release non firmata."
+            echo "::notice::No release keystore configured: building unsigned release APKs."
           fi
           gradle --no-daemon --console=plain assembleRelease
           ls -l app/build/outputs/apk/release/
