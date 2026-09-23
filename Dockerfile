@@ -20,7 +20,4 @@ COPY scripts/fetch-libretro.sh scripts/fetch-libretro.sh
 COPY patches/dosbox-libretro-android.patch patches/dosbox-libretro-android.patch
 RUN ./scripts/fetch-libretro.sh
 COPY . .
-RUN --mount=type=cache,target=/root/.gradle gradle --no-daemon --console=plain test assembleDebug
-
-FROM scratch AS artifacts
-COPY --from=build /src/app/build/outputs/apk/debug/ /
+RUN gradle --no-daemon --console=plain test
