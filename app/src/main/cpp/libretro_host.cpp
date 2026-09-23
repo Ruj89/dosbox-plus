@@ -7,16 +7,21 @@
 #include <cstdint>
 #include <deque>
 #include <mutex>
+#include <memory>
 #include <string>
 #include <thread>
 #include <vector>
 
-#include "libretro.h"
+#include "libretro_core.h"
 
 namespace {
 std::atomic<bool> running{false};
 std::atomic<bool> shutdown_requested{false};
 std::thread core_thread;
+std::mutex lifecycle_mutex;
+// Keep in sync with DosboxNative.STATE_*.
+enum class CoreState { IDLE = 0, STARTING = 1, RUNNING = 2, STOPPED = 3, FAILED = 4 };
+std::atomic<CoreState> core_state{CoreState::IDLE};
 std::string system_dir;
 std::string save_dir;
 std::string content_dir;
@@ -149,35 +154,92 @@ unsigned scan_code_to_retro(int code) {
     if (code == 75) return RETROK_LEFT;
     if (code == 77) return RETROK_RIGHT;
     if (code == 80) return RETROK_DOWN;
+    // Extended keys and distinct keypad digits; see KeyboardKeys.kt.
+    switch (code) {
+        case 86: return RETROK_OEM_102;
+        case 87: return RETROK_F11;
+        case 88: return RETROK_F12;
+        case 96: return RETROK_KP_ENTER;
+        case 97: return RETROK_RCTRL;
+        case 98: return RETROK_KP_DIVIDE;
+        case 99: return RETROK_SYSREQ;
+        case 100: return RETROK_RALT;
+        case 102: return RETROK_HOME;
+        case 103: return RETROK_UP;
+        case 104: return RETROK_PAGEUP;
+        case 105: return RETROK_LEFT;
+        case 106: return RETROK_RIGHT;
+        case 107: return RETROK_END;
+        case 108: return RETROK_DOWN;
+        case 109: return RETROK_PAGEDOWN;
+        case 110: return RETROK_INSERT;
+        case 111: return RETROK_DELETE;
+        case 119: return RETROK_PAUSE;
+        case 0x147: return RETROK_KP7;
+        case 0x148: return RETROK_KP8;
+        case 0x149: return RETROK_KP9;
+        case 0x14b: return RETROK_KP4;
+        case 0x14c: return RETROK_KP5;
+        case 0x14d: return RETROK_KP6;
+        case 0x14f: return RETROK_KP1;
+        case 0x150: return RETROK_KP2;
+        case 0x151: return RETROK_KP3;
+        case 0x152: return RETROK_KP0;
+    }
     if (code >= 0 && code < 128 && table[code]) return table[code];
     return static_cast<unsigned>(code);
 }
 
 void run_core(std::string content_path) {
-    retro_set_environment(environment);
-    retro_set_video_refresh(video_refresh);
-    retro_set_audio_sample(nullptr);
-    retro_set_audio_sample_batch(audio_batch);
-    retro_set_input_poll(input_poll);
-    retro_set_input_state(input_state);
-    retro_init();
-    retro_game_info game{};
-    game.path = content_path.c_str();
-    if (!retro_load_game(&game)) {
-        running = false;
-        retro_deinit();
-        return;
+    std::unique_ptr<LibretroCore> core;
+    bool initialized = false;
+    bool loaded = false;
+    bool failed = false;
+    try {
+        core = std::make_unique<LibretroCore>();
+        core->set_environment(environment);
+        core->set_video_refresh(video_refresh);
+        core->set_audio_sample(nullptr);
+        core->set_audio_sample_batch(audio_batch);
+        core->set_input_poll(input_poll);
+        core->set_input_state(input_state);
+        core->init();
+        initialized = true;
+        retro_game_info game{};
+        game.path = content_path.c_str();
+        loaded = core->load_game(&game);
+        if (!loaded) throw std::runtime_error("DOSBox rejected the game configuration");
+        // This core installs its keyboard callback in MAPPER_Init, which is
+        // reached via port configuration, not retro_init. Without this call
+        // every touchscreen key was silently discarded by input_poll.
+        core->set_controller_port_device(0, RETRO_DEVICE_KEYBOARD);
+        running = true;
+        core_state = CoreState::RUNNING;
+        auto next = std::chrono::steady_clock::now();
+        while (running && !shutdown_requested) {
+            core->run();
+            next += std::chrono::microseconds(16667);
+            std::this_thread::sleep_until(next);
+        }
+    } catch (const std::exception &error) {
+        log_message(RETRO_LOG_ERROR, "Core session failed: %s\n", error.what());
+        failed = true;
+    } catch (...) {
+        log_message(RETRO_LOG_ERROR, "Core session failed with an unexpected exception\n");
+        failed = true;
     }
-    running = true;
-    auto next = std::chrono::steady_clock::now();
-    while (running && !shutdown_requested) {
-        retro_run();
-        next += std::chrono::microseconds(16667);
-        std::this_thread::sleep_until(next);
+    try {
+        if (loaded) core->unload_game();
+        if (initialized) core->deinit();
+    } catch (...) {
+        log_message(RETRO_LOG_ERROR, "Core cleanup failed\n");
+        failed = true;
     }
-    retro_unload_game();
-    retro_deinit();
+    // No callback into the library may survive dlclose.
+    keyboard_callback = nullptr;
+    core.reset();
     running = false;
+    core_state = failed ? CoreState::FAILED : CoreState::STOPPED;
 }
 
 std::string java_string(JNIEnv *env, jstring value) {
@@ -190,13 +252,27 @@ std::string java_string(JNIEnv *env, jstring value) {
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_org_dosboxplus_emulator_DosboxNative_start(JNIEnv *env, jobject, jstring config, jstring system, jstring save) {
-    if (core_thread.joinable()) return JNI_FALSE;
+    std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mutex);
+    if (core_thread.joinable()) {
+        const auto state = core_state.load();
+        if (state == CoreState::STARTING || state == CoreState::RUNNING) return JNI_FALSE;
+        core_thread.join();
+    }
     std::string content = java_string(env, config);
     system_dir = java_string(env, system);
     save_dir = java_string(env, save);
     auto slash = content.find_last_of('/');
     content_dir = slash == std::string::npos ? system_dir : content.substr(0, slash);
     shutdown_requested = false;
+    running = false;
+    pixel_format = RETRO_PIXEL_FORMAT_XRGB8888;
+    keyboard_callback = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(input_mutex);
+        key_events.clear();
+        mouse_dx = 0; mouse_dy = 0;
+        for (auto &button : mouse_buttons) button = false;
+    }
     {
         std::lock_guard<std::mutex> lock(frame_mutex);
         frame.clear(); frame_width = 0; frame_height = 0; frame_generation = 0;
@@ -205,17 +281,30 @@ Java_org_dosboxplus_emulator_DosboxNative_start(JNIEnv *env, jobject, jstring co
         std::lock_guard<std::mutex> lock(audio_mutex);
         audio_samples.clear();
     }
-    core_thread = std::thread(run_core, content);
+    core_state = CoreState::STARTING;
+    try {
+        core_thread = std::thread(run_core, content);
+    } catch (const std::exception &error) {
+        log_message(RETRO_LOG_ERROR, "Cannot start core thread: %s\n", error.what());
+        core_state = CoreState::FAILED;
+        return JNI_FALSE;
+    }
     return JNI_TRUE;
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_org_dosboxplus_emulator_DosboxNative_stop(JNIEnv *, jobject) {
+    std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mutex);
     shutdown_requested = true;
     running = false;
     if (core_thread.joinable()) core_thread.join();
     std::lock_guard<std::mutex> lock(audio_mutex);
     audio_samples.clear();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_org_dosboxplus_emulator_DosboxNative_state(JNIEnv *, jobject) {
+    return static_cast<jint>(core_state.load());
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -243,9 +332,10 @@ Java_org_dosboxplus_emulator_DosboxNative_frameInfo(JNIEnv *, jobject) {
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_org_dosboxplus_emulator_DosboxNative_copyFrame(JNIEnv *env, jobject, jintArray target) {
+Java_org_dosboxplus_emulator_DosboxNative_copyFrame(JNIEnv *env, jobject, jintArray target, jint width, jint height) {
     std::lock_guard<std::mutex> lock(frame_mutex);
-    if (env->GetArrayLength(target) < static_cast<jsize>(frame.size())) return JNI_FALSE;
+    if (width != static_cast<jint>(frame_width) || height != static_cast<jint>(frame_height) ||
+        env->GetArrayLength(target) != static_cast<jsize>(frame.size())) return JNI_FALSE;
     env->SetIntArrayRegion(target, 0, static_cast<jsize>(frame.size()), frame.data());
     return JNI_TRUE;
 }

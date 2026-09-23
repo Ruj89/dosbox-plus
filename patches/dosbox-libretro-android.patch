@@ -52,4 +52,20 @@
 +      ".type _co_switch_arm, %function\n"
        "co_switch_arm:\n"
        "_co_switch_arm:\n"
-       "  stmia r1!, {r4, r5, r6, r7, r8, r9, r10, r11, sp, lr}\n"
+        "  stmia r1!, {r4, r5, r6, r7, r8, r9, r10, r11, sp, lr}\n"
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -102,1 +102,1 @@
+-static bool frontend_exit;
++bool frontend_exit;
+--- a/libretro/dos_gfx.cpp
++++ b/libretro/dos_gfx.cpp
+@@ -56,1 +56,7 @@
+-void GFX_Events(){}
++extern bool frontend_exit;
++void GFX_Events()
++{
++    // Unwind start_dosbox/Config before retro_deinit deletes its coroutine.
++    // Otherwise mounted drives, memory and file handles survive every close.
++    if (frontend_exit) throw 0;
++}
